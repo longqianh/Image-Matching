@@ -14,20 +14,8 @@ from models.utils import (compute_pose_error, compute_epipolar_error,
 class Arg(object):
 
   def __init__(self,
-               config={
-                   'superpoint': {
-                       'nms_radius': 4,
-                       'keypoint_threshold': 0.005,
-                       'max_keypoints': -1
-                   },
-                   'superglue': {
-                       # choices={'indoor', 'outdoor'}
-                       'weights': 'outdoor',
-                       'sinkhorn_iterations': 20,
-                       'match_threshold': 0.2,
-                   }
-               },
-               _input='assets/input_img/',
+               config={},
+               _input='./assets/input_img/',
                _output=None,
                scene_mode='outdoor',
                skip=1,
@@ -63,22 +51,31 @@ class Arg(object):
 
 
 def get_similarity(img1, img2, args, device='cpu'):
-  t_img0 = frame2tensor(img1, device)
-  t_img1 = frame2tensor(img2, device)
+  anchor = frame2tensor(img1, device)
+  to_match = frame2tensor(img2, device)
 
   matching = Matching(args.config).eval().to(device)  # matching model
-  pred = matching({'image0': t_img0, 'image1': t_img1})
+  pred = matching({'image0': anchor, 'image1': to_match})
   conf = pred['matching_scores0']
   return torch.mean(conf).item(), torch.max(conf).item()
 
 
 # 下一步：set anchor以后想办法加速 把kpts直接存好 应该可以快一倍
 
+default_config = {'superpoint': {
+    'nms_radius': 4,
+    'keypoint_threshold': 0.005,
+    'max_keypoints': -1
+},
+    'superglue': {
+    # choices={'indoor', 'outdoor'}
+    'weights': 'outdoor',
+    'sinkhorn_iterations': 20,
+    'match_threshold': 0.2,
+}}
 torch.set_grad_enabled(False)
-# device = 'cuda' if torch.cuda.is_available() and not opt.force_cpu else 'cpu'
-device = 'cpu'
-args = Arg(scene_mode='indoor')
-# 后续改进
+device = 'cuda' if torch.cuda.is_available() and not opt.force_cpu else 'cpu'
+args = Arg(scene_mode='outdoor')
 name0 = 'anchor.jpg'
 name1 = 'tomatch.jpg'
 # image0, inp0, scales0 = read_image(
@@ -89,4 +86,4 @@ name1 = 'tomatch.jpg'
 # print(inp0)
 img0 = cv2.imread(args.input_dir + name0, cv2.IMREAD_GRAYSCALE)
 img1 = cv2.imread(args.input_dir + name1, cv2.IMREAD_GRAYSCALE)
-print(get_similarity(img0, img1, args))
+# print(get_similarity(img0, img1, args, device))
