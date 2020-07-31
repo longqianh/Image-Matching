@@ -53,7 +53,7 @@ def read_image(path, device='cpu', resize=[640, 480], rotation=0, resize_float=0
         return None, None, None
     w, h = image.shape[1], image.shape[0]
     w_new, h_new = process_resize(w, h, resize)
-    scales = (float(w_new) / float(w), float(h_new) / float(h))
+    # scales = (float(w_new) / float(w), float(h_new) / float(h))
 
     if resize_float:
         image = cv2.resize(image.astype('float32'), (w_new, h_new))
@@ -66,7 +66,8 @@ def read_image(path, device='cpu', resize=[640, 480], rotation=0, resize_float=0
             scales = scales[::-1]
 
     img_tensor = frame2tensor(image, device)
-    return image, img_tensor, scales
+    # return image, img_tensor, scales
+    return img_tensor
 
 
 # --- Pose Estimation ---

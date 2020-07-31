@@ -9,6 +9,9 @@ import torch
 from .superpoint import SuperPoint
 from .superglue import SuperGlue
 
+# from superpoint import SuperPoint
+# from superglue import SuperGlue
+
 
 class Matching(torch.nn.Module):
     """ Image Matching Frontend (SuperPoint + SuperGlue) """
@@ -36,6 +39,7 @@ class Matching(torch.nn.Module):
         if 'keypoints1' not in data:
             pred1 = self.superpoint({'image': data['image1']})
             pred = {**pred, **{k + '1': v for k, v in pred1.items()}}
+
         # print(pred)
         # Batch all features
         # We should either have i) one image per batch, or
@@ -46,7 +50,45 @@ class Matching(torch.nn.Module):
             if isinstance(data[k], (list, tuple)):
                 data[k] = torch.stack(data[k])
 
-        # Perform the matching
-        pred = {**pred, **self.superglue(data)}
+        pred = self.superglue(data)['matching_scores0']
+        return torch.mean(pred).item()
 
-        return pred
+        # pred = {**pred, **self.superglue(data)}
+
+        # return pred
+
+
+if __name__ == '__main__':
+    from utils import read_image
+    default_config = {'superpoint': {
+        'nms_radius': 4,
+        'keypoint_threshold': 0.005,
+        'max_keypoints': -1
+    },
+        'superglue': {
+        # choices={'indoor', 'outdoor'}
+        'weights': 'outdoor',
+        'sinkhorn_iterations': 20,
+        'match_threshold': 0.2,
+    }}
+    m = Matching(default_config).eval()  # matching model
+    name0 = 'anchor.jpg'
+    name1 = 'tomatch.jpg'
+    name2 = 'to_match2.jpg'
+    anchor_t = read_image(
+        "../assets/input_img/" + name0, )
+
+    # superpoint = SuperPoint(default_config.get('superpoint', {}))
+
+    test1 = read_image(
+        "../assets/input_img/" + name1)
+    test2 = read_image(
+        "../assets/input_img/" + name2)
+    # print(timg0.shape)
+    data = {"image0": anchor_t, "image1": test1}
+    # print(m(data))  # 5.7s
+    s1, data = m(data)
+
+    data["image1"] = test2
+    s2, _ = m(data)
+    # print(m(data))

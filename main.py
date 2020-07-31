@@ -3,6 +3,7 @@ from pathlib import Path
 import torch
 import numpy as np
 from models.matching import Matching
+from models.superpoint import SuperPoint
 from models.utils import frame2tensor
 from models.utils import (compute_pose_error, compute_epipolar_error,
                           estimate_pose,
@@ -14,7 +15,6 @@ from models.utils import (compute_pose_error, compute_epipolar_error,
 class Arg(object):
 
   def __init__(self,
-               config={},
                _input='./assets/input_img/',
                _output=None,
                scene_mode='outdoor',
@@ -23,67 +23,104 @@ class Arg(object):
                max_length=1000000):
 
     super(Arg, self).__init__()
-    # self.nms_radius=nms_radius
-    # self.keypoint_threshold=keypoint_threshold
+    self.set_config()
     self.input_dir = _input
-    # 'ID of a USB webcam, URL of an IP camera, '
-    # 'or path to an image directory or movie file'
-    self.config = config
     self.output_dir = _output
-    if scene_mode == 'outdoor':
-      self.resize = [1600]
-      self.max_kpts = 2048
-      self.nms_radius = 3
-    else:
-      self.resize = [640]
-      self.max_kpts = 1024
-      self.nms_radius = 4
 
     self.skip = skip
     self.img_glob = img_glob
     self.max_length = max_length
 
-  def set_config():
-    pass
+    self.data = {}
+    self.superpoint = SuperPoint(self.config.get('superpoint', {}))
 
-  def set_anchor_img():
-    pass
+  def set_input_dir(self, input_dir):
+    self.input_dir = input_dir
+
+  def set_output_dir(self, output_dir):
+    self.output_dir = output_dir
+
+  def set_skip(self, skip):
+    self.skip = skip
+
+  def set_max_length(self, max_length):
+    self.max_length = max_length
+
+  def set_img_glob(self, glob):
+    self.img_glob = img_glob
+
+  def set_config(self, config=None):
+    if config == None:
+      self.config = {'superpoint': {
+          'nms_radius': 4,
+          'keypoint_threshold': 0.005,
+          'max_keypoints': -1
+      },
+          'superglue': {
+          # choices={'indoor', 'outdoor'}
+          'weights': 'outdoor',
+          'sinkhorn_iterations': 20,
+          'match_threshold': 0.2,
+      }}  # default_config
+
+    else:
+      self.config = config
+
+  def set_superopint(self, config):
+    self.superpoint = SuperPoint(config.get('superpoint', {}))
+
+  def set_scene_mode(self, mode):
+    if mode == 'outdoor':
+      self.resize = [1600]
+      self.max_kpts = 2048
+      self.nms_radius = 3
+    elif mode == 'indoor':
+      self.resize = [640]
+      self.max_kpts = 1024
+      self.nms_radius = 4
+
+  def set_anchor(self, img_name):
+
+    anchor_tensor = read_image(self.input_dir + img_name)
+    self.data['image0'] = anchor_tensor
+
+    anchor_feature = self.superpoint({'image': anchor_tensor})
+    self.data = {**self.data, **
+                 {k + '0': v for k, v in anchor_feature.items()}}
+
+  def set_match(self, match_name):
+    # put image to match into the data
+    # 似乎更慢了
+    match_tensor = read_image(self.input_dir + match_name)
+    self.data['image1'] = match_tensor
+    match_feature = self.superpoint({'image': match_tensor})
+    if self.data == None:
+      self.data = {k + '1': v for k, v in match_feature.items()}
+    else:
+      self.data = {**self.data, **
+                   {k + '1': v for k, v in match_feature.items()}}
 
 
-def get_similarity(img1, img2, args, device='cpu'):
-  anchor = frame2tensor(img1, device)
-  to_match = frame2tensor(img2, device)
-
+def get_similarity(args, name, device='cpu'):
+  args.set_match(name)
   matching = Matching(args.config).eval().to(device)  # matching model
-  pred = matching({'image0': anchor, 'image1': to_match})
-  conf = pred['matching_scores0']
-  return torch.mean(conf).item(), torch.max(conf).item()
+  return matching(args.data)
 
 
-# 下一步：set anchor以后想办法加速 把kpts直接存好 应该可以快一倍
+if __name__ == '__main__':
+  args = Arg(scene_mode='outdoor')
+  args.set_anchor('zju1.jpg')
+  print(get_similarity(args, 'zju2.jpg'))
 
-default_config = {'superpoint': {
-    'nms_radius': 4,
-    'keypoint_threshold': 0.005,
-    'max_keypoints': -1
-},
-    'superglue': {
-    # choices={'indoor', 'outdoor'}
-    'weights': 'outdoor',
-    'sinkhorn_iterations': 20,
-    'match_threshold': 0.2,
-}}
-torch.set_grad_enabled(False)
-device = 'cuda' if torch.cuda.is_available() and not opt.force_cpu else 'cpu'
-args = Arg(scene_mode='outdoor')
-name0 = 'anchor.jpg'
-name1 = 'tomatch.jpg'
-# image0, inp0, scales0 = read_image(
-#     args.input_dir + name0, device, args.resize)
-# image1, inp1, scales1 = read_image(
-#     args.input_dir + name1, device, args.resize)
-# matches_path = 'assets/match_res.npz'
-# print(inp0)
-img0 = cv2.imread(args.input_dir + name0, cv2.IMREAD_GRAYSCALE)
-img1 = cv2.imread(args.input_dir + name1, cv2.IMREAD_GRAYSCALE)
-# print(get_similarity(img0, img1, args, device))
+  # torch.set_grad_enabled(False)
+  # device = 'cuda' if torch.cuda.is_available() and not opt.force_cpu else 'cpu'
+  # name0 = 'anchor.jpg'
+  # args.set_anchor(name0)
+  # name1 = 'to_match.jpg'
+  # name2 = 'to_match2.jpg'
+  # name3 = 'to_match3.jpg'
+  # name4 = 'to_match4.jpg'
+  # print(get_similarity(args, name1))
+  # print(get_similarity(args, name2))
+  # # print(get_similarity(args, name3))
+  # # print(get_similarity(args, name4))

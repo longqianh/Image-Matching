@@ -101,11 +101,12 @@ class SuperPoint(nn.Module):
         if mk == 0 or mk < -1:
             raise ValueError('\"max_keypoints\" must be positive or \"-1\"')
 
-        print('Loaded SuperPoint model')
+        # print('Loaded SuperPoint model')
 
     def forward(self, data):
         """ Compute keypoints, scores, descriptors for image """
         # Shared Encoder
+
         x = self.relu(self.conv1a(data['image']))
         x = self.relu(self.conv1b(x))
         x = self.pool(x)
@@ -162,3 +163,22 @@ class SuperPoint(nn.Module):
             'scores': scores,
             'descriptors': descriptors,
         }
+
+
+if __name__ == '__main__':
+    # import cv2
+    from utils import (compute_pose_error, compute_epipolar_error,
+                       estimate_pose,
+                       pose_auc, read_image)
+
+    impath0 = '../assets/input_img/anchor1.jpg'
+    impath1 = '../assets/input_img/to_match.jpg'
+    _, img_tensor0, _ = read_image(impath0)
+    _, img_tensor1, _ = read_image(impath1)
+    # plot_image_pair([img0, img1])
+    m = SuperPoint({})
+    data = {"image": img_tensor0}
+    res = m(data)
+    # print(res['descriptors'][0].shape)  # torch.Size([256, 691]) 每一列是一个特征描述向量?
+    # print(res['scores'][0].shape)  # torch.Size([691])
+    # print(res['keypoints'][0].shape)  # torch.Size([691, 2])
