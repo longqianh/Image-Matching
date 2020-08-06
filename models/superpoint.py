@@ -173,12 +173,18 @@ if __name__ == '__main__':
 
     impath0 = '../assets/input_img/anchor1.jpg'
     impath1 = '../assets/input_img/to_match.jpg'
-    _, img_tensor0, _ = read_image(impath0)
-    _, img_tensor1, _ = read_image(impath1)
+    img_tensor0= read_image(impath0)
+    img_tensor1= read_image(impath1)
     # plot_image_pair([img0, img1])
     m = SuperPoint({})
+    
+    
     data = {"image": img_tensor0}
-    res = m(data)
+    # ts=torch.jit.trace(m,data)
+    # print(ts)
+    # res = m(data)
+    # print(res)
     # print(res['descriptors'][0].shape)  # torch.Size([256, 691]) 每一列是一个特征描述向量?
     # print(res['scores'][0].shape)  # torch.Size([691])
+
     # print(res['keypoints'][0].shape)  # torch.Size([691, 2])

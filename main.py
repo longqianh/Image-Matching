@@ -4,12 +4,7 @@ import torch
 import numpy as np
 from models.matching import Matching
 from models.superpoint import SuperPoint
-from models.utils import frame2tensor
-from models.utils import (compute_pose_error, compute_epipolar_error,
-                          estimate_pose,
-                          pose_auc, read_image,
-                          rotate_intrinsics, rotate_pose_inplane,
-                          scale_intrinsics)
+from models.utils import (read_image,frame2tensor,pt2onnx,onnx2pb,do_transfer)
 
 
 class Arg(object):
@@ -106,11 +101,17 @@ def get_similarity(args, name, device='cpu'):
   matching = Matching(args.config).eval().to(device)  # matching model
   return matching(args.data)
 
-
 if __name__ == '__main__':
   args = Arg(scene_mode='outdoor')
   args.set_anchor('zju1.jpg')
-  print(get_similarity(args, 'zju2.jpg'))
+  args.set_match('zju2.jpg')
+  # print(get_similarity(args, 'zju2.jpg'))
+  m=Matching(args.config).eval()
+  # ms=torch.jit.trace(m,args.data)
+  # pt2onnx(m,args.data)
+  print(m(args.data))
+
+
 
   # torch.set_grad_enabled(False)
   # device = 'cuda' if torch.cuda.is_available() and not opt.force_cpu else 'cpu'
